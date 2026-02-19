@@ -22,3 +22,11 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Ngrok
+ngrok.exe
+ngrok.zip
+install_ngrok.ps1
+
+# Local Data
+messages.json

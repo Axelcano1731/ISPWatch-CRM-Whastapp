@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -16,7 +17,7 @@ class WhatsAppController extends Controller
         $this->whatsappService = $whatsappService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
         // Load messages from local storage (JSON file)
         $messages = [];
@@ -24,13 +25,49 @@ class WhatsAppController extends Controller
             $messages = json_decode(Storage::disk('local')->get('messages.json'), true);
         }
 
-        // Sort by date desc
-        usort($messages, function ($a, $b) {
-            return strtotime($b['created_at']) - strtotime($a['created_at']);
+        // Grouper messages by phone
+        $conversations = [];
+        foreach ($messages as $msg) {
+            $phone = $msg['phone'];
+            if (!isset($conversations[$phone])) {
+                $conversations[$phone] = [
+                    'phone' => $phone,
+                    'messages' => [],
+                    'last_message' => null,
+                ];
+            }
+            $conversations[$phone]['messages'][] = $msg;
+        }
+
+        // Sort messages within each conversation and determine last message
+        foreach ($conversations as &$conv) {
+            usort($conv['messages'], function ($a, $b) {
+                return strtotime($a['created_at']) - strtotime($b['created_at']);
+            });
+            $conv['last_message'] = end($conv['messages']);
+        }
+
+        // Convert key-value array to indexed array and sort by last message date desc
+        $conversationsList = array_values($conversations);
+        usort($conversationsList, function ($a, $b) {
+            return strtotime($b['last_message']['created_at']) - strtotime($a['last_message']['created_at']);
         });
 
+        // Determine active chat
+        $activePhone = $request->query('phone');
+        $activeChat = [];
+
+        if ($activePhone && isset($conversations[$activePhone])) {
+            $activeChat = $conversations[$activePhone]['messages'];
+        } elseif (empty($activePhone) && !empty($conversationsList)) {
+            $activePhone = $conversationsList[0]['phone'];
+            $activeChat = $conversationsList[0]['messages'];
+        }
+
         return Inertia::render('Dashboard', [
-            'messages' => $messages
+            'conversations' => $conversationsList,
+            'activeChat' => $activeChat,
+            'activePhone' => $activePhone,
         ]);
     }
 
@@ -66,9 +103,56 @@ class WhatsAppController extends Controller
             $messages[] = $newMessage;
             Storage::disk('local')->put('messages.json', json_encode($messages, JSON_PRETTY_PRINT));
 
-            return redirect()->back()->with('success', 'Mensaje enviado correctamente.');
+            return to_route('dashboard', ['phone' => $phone])->with('success', 'Mensaje enviado correctamente.');
         }
 
-        return redirect()->back()->withErrors(['message' => 'Error al enviar mensaje: ' . ($result['error'] ?? 'Unknown error')]);
+        return to_route('dashboard', ['phone' => $phone])->withErrors(['message' => 'Error al enviar mensaje: ' . ($result['error'] ?? 'Unknown error')]);
+    }
+    public function verifyWebhook(Request $request)
+    {
+        $mode = $request->query('hub_mode');
+        $token = $request->query('hub_verify_token');
+        $challenge = $request->query('hub_challenge');
+
+        if ($mode === 'subscribe' && $token === config('services.whatsapp.verify_token', 'ispwatch-token')) {
+            return response($challenge, 200);
+        }
+
+        return response()->json(['error' => 'Forbidden'], 403);
+    }
+
+    public function handleWebhook(Request $request)
+    {
+        $payload = $request->all();
+
+        Log::info('Webhook received:', $payload);
+
+        if (isset($payload['entry'][0]['changes'][0]['value']['messages'][0])) {
+            $messageData = $payload['entry'][0]['changes'][0]['value']['messages'][0];
+
+            $phone = $messageData['from'];
+            $text = $messageData['text']['body'] ?? '';
+
+            // Save to local storage
+            $messages = [];
+            if (Storage::disk('local')->exists('messages.json')) {
+                $messages = json_decode(Storage::disk('local')->get('messages.json'), true);
+            }
+
+            $newMessage = [
+                'id' => $messageData['id'],
+                'phone' => $phone,
+                'message' => $text,
+                'status' => 'received',
+                'created_at' => now()->toDateTimeString(),
+            ];
+
+            $messages[] = $newMessage;
+            Storage::disk('local')->put('messages.json', json_encode($messages, JSON_PRETTY_PRINT));
+        } else {
+            Log::warning('Webhook received but no messages found in payload', ['payload' => $payload]);
+        }
+
+        return response()->json(['status' => 'EVENT_RECEIVED']);
     }
 }

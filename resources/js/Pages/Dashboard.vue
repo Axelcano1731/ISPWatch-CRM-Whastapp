@@ -115,6 +115,14 @@ onMounted(() => {
 onUnmounted(() => {
     if (pollingInterval) clearInterval(pollingInterval);
 });
+function formatPhone(phone) {
+    if (!phone) return '';
+    // If phone starts with 57 and has 12 digits (57 + 10 digits), remove 57
+    if (phone.startsWith('57') && phone.length === 12) {
+        return phone.substring(2);
+    }
+    return phone;
+}
 </script>
 
 <template>
@@ -181,7 +189,7 @@ onUnmounted(() => {
                             </div>
                             <div class="ml-4 flex-1 min-w-0">
                                 <div class="flex justify-between items-baseline mb-1">
-                                    <h3 class="text-sm font-medium text-gray-900 truncate">{{ conv.phone }}</h3>
+                                    <h3 class="text-sm font-medium text-gray-900 truncate">{{ formatPhone(conv.phone) }}</h3>
                                     <span class="text-xs text-gray-500">{{ formatDate(conv.last_message?.created_at) }}</span>
                                 </div>
                                 <p class="text-sm text-gray-500 truncate">
@@ -215,7 +223,7 @@ onUnmounted(() => {
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <h2 class="text-gray-900 font-medium">{{ activePhone }}</h2>
+                            <h2 class="text-gray-900 font-medium">{{ formatPhone(activePhone) }}</h2>
                             <p class="text-xs text-green-600">En línea</p>
                         </div>
                     </div>
@@ -295,7 +303,7 @@ onUnmounted(() => {
                 
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full z-50 relative">
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div class="sm:flex sm:items-start">
                             <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
@@ -316,7 +324,10 @@ onUnmounted(() => {
                                             type="text" 
                                             placeholder="57300..."
                                             class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2 border"
+                                            :class="{'border-red-500': newChatForm.errors.phone}"
                                         >
+                                        <p v-if="newChatForm.errors.phone" class="text-red-500 text-xs mt-1">{{ newChatForm.errors.phone }}</p>
+                                        <p class="text-xs text-gray-500 mt-1">Incluye el código de país (ej: 57 para Colombia).</p>
                                     </div>
                                     <div>
                                         <label for="new-message" class="block text-sm font-medium text-gray-700">Mensaje</label>
@@ -326,7 +337,9 @@ onUnmounted(() => {
                                             rows="3" 
                                             placeholder="Hola..."
                                             class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2 border"
+                                            :class="{'border-red-500': newChatForm.errors.message}"
                                         ></textarea>
+                                        <p v-if="newChatForm.errors.message" class="text-red-500 text-xs mt-1">{{ newChatForm.errors.message }}</p>
                                     </div>
                                 </div>
                             </div>

@@ -5,6 +5,13 @@ import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 
+import { ZiggyVue } from 'ziggy-js';
+import { Ziggy } from './ziggy';
+import { route } from 'ziggy-js';
+
+// Mixin Ziggy config into the route function for global usage
+window.route = (name, params, absolute, config = Ziggy) => route(name, params, absolute, config);
+
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 createInertiaApp({
@@ -13,6 +20,7 @@ createInertiaApp({
     setup({ el, App, props, plugin }) {
         return createApp({ render: () => h(App, props) })
             .use(plugin)
+            .use(ZiggyVue)
             .mount(el);
     },
     progress: {

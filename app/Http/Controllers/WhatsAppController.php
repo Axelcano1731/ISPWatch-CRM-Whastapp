@@ -17,6 +17,19 @@ class WhatsAppController extends Controller
         $this->whatsappService = $whatsappService;
     }
 
+    private function normalizePhone($phone)
+    {
+        // Remove non-numeric characters
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+
+        // If it's a Colombian mobile number (10 digits, starts with 3), add 57
+        if (strlen($phone) === 10 && str_starts_with($phone, '3')) {
+            $phone = '57' . $phone;
+        }
+
+        return $phone;
+    }
+
     public function index(Request $request)
     {
         // Load messages from local storage (JSON file)
@@ -28,7 +41,7 @@ class WhatsAppController extends Controller
         // Grouper messages by phone
         $conversations = [];
         foreach ($messages as $msg) {
-            $phone = $msg['phone'];
+            $phone = $this->normalizePhone($msg['phone']); // Normalize for grouping
             if (!isset($conversations[$phone])) {
                 $conversations[$phone] = [
                     'phone' => $phone,
@@ -55,6 +68,10 @@ class WhatsAppController extends Controller
 
         // Determine active chat
         $activePhone = $request->query('phone');
+        if ($activePhone) {
+            $activePhone = $this->normalizePhone($activePhone);
+        }
+
         $activeChat = [];
 
         if ($activePhone && isset($conversations[$activePhone])) {
@@ -74,11 +91,11 @@ class WhatsAppController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'phone' => 'required|string',
+            'phone' => 'required|numeric|digits_between:10,15',
             'message' => 'required|string',
         ]);
 
-        $phone = $request->input('phone');
+        $phone = $this->normalizePhone($request->input('phone'));
         $messageContent = $request->input('message');
 
         // Send via service
@@ -93,7 +110,7 @@ class WhatsAppController extends Controller
 
             $newMessage = [
                 'id' => uniqid(),
-                'phone' => $phone,
+                'phone' => $phone, // Save normalized
                 'message' => $messageContent,
                 'status' => 'sent',
                 'created_at' => now()->toDateTimeString(),
@@ -108,6 +125,7 @@ class WhatsAppController extends Controller
 
         return to_route('dashboard', ['phone' => $phone])->withErrors(['message' => 'Error al enviar mensaje: ' . ($result['error'] ?? 'Unknown error')]);
     }
+
     public function verifyWebhook(Request $request)
     {
         $mode = $request->query('hub_mode');
@@ -132,6 +150,9 @@ class WhatsAppController extends Controller
 
             $phone = $messageData['from'];
             $text = $messageData['text']['body'] ?? '';
+
+            // Normalize phone from webhook
+            $phone = $this->normalizePhone($phone);
 
             // Save to local storage
             $messages = [];

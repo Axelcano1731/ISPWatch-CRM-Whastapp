@@ -3,7 +3,7 @@ import { Link, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 
 const page = usePage();
-const sidebarOpen = ref(false);
+const sidebarOpen = ref(typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
 const flashMessage = ref(null);
 const flashType = ref('success');
 
@@ -81,10 +81,19 @@ watch(() => page.props.flash, (flash) => {
     }
 }, { deep: true, immediate: true });
 
-watch(currentRoute, () => { sidebarOpen.value = false; });
+watch(currentRoute, () => { 
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        sidebarOpen.value = false; 
+    }
+});
 
 function handleEsc(e) {
-    if (e.key === 'Escape') { sidebarOpen.value = false; showThemeMenu.value = false; }
+    if (e.key === 'Escape') { 
+        if (typeof window !== 'undefined' && window.innerWidth < 768) {
+            sidebarOpen.value = false; 
+        }
+        showThemeMenu.value = false; 
+    }
 }
 onMounted(() => document.addEventListener('keydown', handleEsc));
 onUnmounted(() => document.removeEventListener('keydown', handleEsc));
@@ -98,36 +107,51 @@ onUnmounted(() => document.removeEventListener('keydown', handleEsc));
 
         <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
         <aside
-            class="fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0"
-            :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+            class="fixed inset-y-0 left-0 z-50 bg-sidebar flex flex-col transform transition-all duration-300 ease-in-out md:relative"
+            :class="[
+                sidebarOpen ? 'w-64 translate-x-0' : 'w-20 -translate-x-full md:translate-x-0'
+            ]"
         >
             <!-- Logo -->
-            <div class="flex items-center h-16 px-5 shrink-0 border-b border-white/10">
-                <div class="flex items-center space-x-3">
-                    <div class="w-9 h-9 rounded-xl bg-accent flex items-center justify-center">
+            <div class="flex items-center h-16 shrink-0 border-b border-white/10"
+                 :class="sidebarOpen ? 'px-5 justify-between' : 'justify-center'">
+                 
+                <!-- Logo & Title -->
+                <div v-show="sidebarOpen" class="flex items-center space-x-3 overflow-hidden">
+                    <div class="w-9 h-9 rounded-xl bg-accent flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
                     </div>
-                    <div>
+                    <div class="truncate">
                         <h1 class="text-white font-bold text-lg tracking-tight">CONVERZA</h1>
                         <p class="text-text-muted text-[10px] uppercase tracking-widest">CRM & Chatbot</p>
                     </div>
                 </div>
+
+                <!-- Hamburger inside sidebar -->
+                <button @click="sidebarOpen = !sidebarOpen" class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition hidden md:block shrink-0" title="Alternar menú">
+                   <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                </button>
             </div>
 
             <!-- Nav -->
-            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
+            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5"
+                 :class="!sidebarOpen && 'flex flex-col items-center px-0 space-y-2'">
                 <Link
                     v-for="item in navItems"
                     :key="item.route"
                     :href="route(item.route)"
-                    class="group flex items-center px-3 py-2.5 rounded-lg text-sm font-medium"
-                    :class="isActive(item.route)
-                        ? 'bg-sidebar-active text-white border-l-[3px] border-accent'
-                        : 'text-text-muted hover:bg-sidebar-hover hover:text-white'"
+                    class="group flex items-center rounded-lg font-medium transition-all duration-200"
+                    :class="[
+                        sidebarOpen ? 'px-3 py-2.5 text-sm w-full' : 'p-3 justify-center w-12 h-12',
+                        isActive(item.route)
+                            ? (sidebarOpen ? 'bg-sidebar-active text-white border-l-[3px] border-accent' : 'bg-sidebar-active text-white')
+                            : 'text-text-muted hover:bg-sidebar-hover hover:text-white'
+                    ]"
+                    :title="!sidebarOpen ? item.name : ''"
                 >
-                    <span class="w-5 h-5 mr-3 shrink-0">
+                    <span class="shrink-0 flex items-center justify-center transition-transform group-hover:scale-110" :class="sidebarOpen ? 'w-5 h-5 mr-3' : 'w-6 h-6'">
                         <svg v-if="item.icon === 'dashboard'" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
                         <svg v-else-if="item.icon === 'contacts'" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
                         <svg v-else-if="item.icon === 'labels'" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" /></svg>
@@ -140,17 +164,17 @@ onUnmounted(() => document.removeEventListener('keydown', handleEsc));
                         <svg v-else-if="item.icon === 'metrics'" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
                         <svg v-else-if="item.icon === 'settings'" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     </span>
-                    {{ item.name }}
+                    <span v-show="sidebarOpen" class="truncate">{{ item.name }}</span>
                 </Link>
             </nav>
 
             <!-- WhatsApp API badge -->
-            <div class="p-3 mx-3 mb-3 rounded-xl bg-sidebar-hover border border-white/5">
-                <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+            <div class="mb-3 transition-all duration-300" :class="sidebarOpen ? 'p-3 mx-3 rounded-xl bg-sidebar-hover border border-white/5' : 'flex justify-center'">
+                <div class="flex items-center" :class="sidebarOpen ? 'space-x-3' : 'flex-col'">
+                    <div class="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0" :title="!sidebarOpen ? 'WhatsApp API: Conectado' : ''">
                         <svg class="w-4 h-4 text-accent" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                     </div>
-                    <div>
+                    <div v-show="sidebarOpen" class="truncate">
                         <p class="text-xs text-white font-medium">WhatsApp API</p>
                         <p class="text-[10px] text-accent">Conectado</p>
                     </div>
